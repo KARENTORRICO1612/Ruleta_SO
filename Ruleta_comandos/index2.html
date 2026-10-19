@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruleta Evaluativa - Preguntas de Sistemas Operativos</title>
+    <!-- Tailwind CSS desde CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome para Iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #18030e 0%, #2b0416 50%, #120008 100%);
+            color: #f8fafc;
+            min-height: 100vh;
+        }
+
+        /* Indicador de aguja triangular superpuesto */
+        .pointer {
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 38px solid #ffe4e6;
+            filter: drop-shadow(0px 6px 8px rgba(0, 0, 0, 0.7));
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 30;
+        }
+
+        /* Brillo neon fucsia/rojo */
+        .neon-border {
+            box-shadow: 0 0 25px rgba(225, 29, 72, 0.4), inset 0 0 15px rgba(236, 72, 153, 0.3);
+        }
+
+        .gradient-btn {
+            background: linear-gradient(135deg, #e11d48 0%, #d946ef 100%);
+            transition: all 0.3s ease;
+        }
+
+        .gradient-btn:hover {
+            background: linear-gradient(135deg, #f43f5e 0%, #e879f9 100%);
+            box-shadow: 0 0 20px rgba(225, 29, 72, 0.6);
+            transform: translateY(-2px);
+        }
+
+        .gradient-btn:active {
+            transform: translateY(1px);
+        }
+
+        /* Scrollbar personalizado */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #e11d48;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+<!-- Encabezado -->
+<header class="py-6 px-4 text-center border-b border-rose-900/40 bg-black/30 backdrop-blur-md">
+    <h1 class="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-fuchsia-400 to-pink-300 tracking-wide">
+        <i class="fa-solid fa-graduation-cap mr-2"></i> Ruleta de preguntas de SO
+    </h1>
+    <p class="text-xs md:text-sm text-rose-200/80 mt-1">Preguntas teóricas de Respaldos, SSH, SCP, SHA-256 y Cron</p>
+</header>
+
+<!-- Contenido Principal -->
+<main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+    <!-- Sección de la Ruleta (Columna Izquierda / Superior) -->
+    <section class="lg:col-span-7 flex flex-col items-center justify-center bg-rose-950/20 p-6 rounded-3xl border border-rose-800/30 neon-border">
+
+        <!-- Selector Visual / Aguja de la Ruleta -->
+        <div class="relative w-full max-w-[460px] aspect-square flex items-center justify-center my-4">
+            <div class="pointer"></div>
+            <canvas id="wheelCanvas" class="w-full h-full rounded-full drop-shadow-2xl"></canvas>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="flex flex-wrap gap-4 mt-4 w-full max-w-md justify-center">
+            <button id="spinBtn" onclick="spinWheel()" class="gradient-btn text-white font-extrabold text-lg md:text-xl py-4 px-8 rounded-2xl w-full flex items-center justify-center gap-3 shadow-lg">
+                <i class="fa-solid fa-play"></i> GIRAR RULETA
+            </button>
+        </div>
+
+        <!-- Contador de Preguntas -->
+        <div class="mt-4 text-xs md:text-sm text-rose-300 font-semibold bg-rose-900/30 px-4 py-2 rounded-full border border-rose-700/40">
+            <span id="itemsCount">18</span> Preguntas activas disponibles
+        </div>
+    </section>
+
+    <!-- Sección de Gestión de Preguntas (Columna Derecha) -->
+    <section class="lg:col-span-5 bg-rose-950/20 p-6 rounded-3xl border border-rose-800/30 backdrop-blur-sm">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-rose-300 flex items-center gap-2">
+                <i class="fa-solid fa-list-check"></i> Banco de Preguntas
+            </h2>
+            <div class="flex gap-2">
+                <button onclick="shareURL()" title="Copiar enlace con preguntas actuales" class="px-3 py-1.5 bg-fuchsia-900/50 hover:bg-fuchsia-800/60 border border-fuchsia-500/40 rounded-xl text-xs text-fuchsia-200 flex items-center gap-1 transition">
+                    <i class="fa-solid fa-share-nodes"></i> Compartir
+                </button>
+                <button onclick="resetDefaultItems()" title="Restablecer preguntas originales" class="px-3 py-1.5 bg-rose-900/50 hover:bg-rose-800/60 border border-rose-500/40 rounded-xl text-xs text-rose-200 flex items-center gap-1 transition">
+                    <i class="fa-solid fa-rotate-left"></i> Reiniciar
+                </button>
+            </div>
+        </div>
+
+        <!-- Formulario para Añadir Pregunta -->
+        <form id="addForm" onsubmit="addItem(event)" class="mb-4 flex gap-2">
+            <input type="text" id="newItemInput" placeholder="Añadir una nueva pregunta..." required
+                   class="flex-1 bg-black/40 border border-rose-800/60 text-rose-100 placeholder-rose-400/50 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-fuchsia-500 transition">
+            <button type="submit" class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition flex items-center gap-1 shrink-0">
+                <i class="fa-solid fa-plus"></i> Añadir
+            </button>
+        </form>
+
+        <!-- Lista de Preguntas con Scroll -->
+        <div class="max-h-[380px] overflow-y-auto pr-1">
+            <ul id="itemsList" class="space-y-2">
+                <!-- Elementos inyectados por JS -->
+            </ul>
+        </div>
+    </section>
+</main>
+
+<!-- Modal de Resultado de la Pregunta Seleccionada -->
+<div id="resultModal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-gradient-to-b from-rose-950 to-neutral-950 border-2 border-rose-500 rounded-3xl p-6 md:p-8 max-w-lg w-full text-center shadow-2xl relative transform transition-all scale-100">
+        <div class="w-16 h-16 bg-rose-600/30 text-rose-400 border border-rose-500/50 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+            <i class="fa-solid fa-circle-question"></i>
+        </div>
+
+        <h3 class="text-sm font-semibold text-rose-400 uppercase tracking-widest mb-1">Pregunta Seleccionada</h3>
+        <p id="modalQuestion" class="text-lg md:text-xl font-bold text-white my-4 leading-relaxed px-2"></p>
+
+        <div class="flex flex-col sm:flex-row gap-3 mt-6">
+            <button id="deleteSelectedBtn" onclick="removeCurrentQuestion()" class="flex-1 bg-rose-800/60 hover:bg-rose-700 text-rose-200 font-semibold py-3 px-4 rounded-xl text-sm border border-rose-600/50 transition flex items-center justify-center gap-2">
+                <i class="fa-solid fa-trash-can"></i> Descartar Pregunta
+            </button>
+            <button onclick="closeModal()" class="flex-1 gradient-btn text-white font-bold py-3 px-4 rounded-xl text-sm transition">
+                Cerrar / Continuar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Mensaje Toast de Notificaciones -->
+<div id="toast" class="fixed bottom-5 right-5 bg-fuchsia-950 text-fuchsia-200 border border-fuchsia-500 px-5 py-3 rounded-2xl shadow-xl hidden z-50 text-sm flex items-center gap-2">
+    <i class="fa-solid fa-circle-check text-fuchsia-400"></i> <span id="toastMsg"></span>
+</div>
+
+<!-- Lógica de la Ruleta en JavaScript -->
+<script>
+    // Lista original con las 18 preguntas solicitadas
+    const defaultQuestions = [
+        "1. ¿Qué diferencia existe entre empaquetar y comprimir información?",
+        "2. ¿Por qué un respaldo almacenado únicamente en el equipo de origen puede ser insuficiente?",
+        "3. ¿Qué función realiza SCP y qué protocolo utiliza?",
+        "4. ¿Qué puerto utiliza SSH de manera predeterminada?",
+        "5. ¿Por qué fue necesario instalar openssh-server en el equipo B?",
+        "6. ¿Qué finalidad tiene la suma SHA-256?",
+        "7. ¿Qué debe concluirse si la suma local y la suma remota son diferentes?",
+        "8. ¿Por qué cron no puede depender de una contraseña escrita manualmente?",
+        "9. ¿Qué diferencia existe entre una llave privada y una llave pública de SSH?",
+        "10. ¿Por qué la llave privada no debe copiarse al equipo remoto?",
+        "11. ¿Qué función realiza la opción BatchMode=yes?",
+        "12. ¿Qué significa la expresión */5 * * * *?",
+        "13. ¿Por qué se recomienda utilizar rutas absolutas en crontab?",
+        "14. ¿Qué información registra respaldo_scp.log?",
+        "15. ¿Qué diferencia existe entre la retención local de 7 días y la remota de 14 días?",
+        "16. ¿Por qué una estrategia de respaldo debe incluir pruebas de restauración?",
+        "17. ¿Qué ocurriría si el equipo B cambia de dirección IP?",
+        "18. ¿Qué controles adicionales aplicarías en un entorno de producción?"
+    ];
+
+    // Paleta de colores en gamas de rojo, fucsia, magenta, carmesí y rosa
+    const colorPalette = [
+        "#e11d48", // Rose 600
+        "#c026d3", // Fuchsia 600
+        "#be123c", // Rose 700
+        "#d946ef", // Fuchsia 500
+        "#9f1239", // Rose 800
+        "#e879f9", // Fuchsia 400
+        "#881337", // Rose 900
+        "#a21caf", // Fuchsia 700
+        "#f43f5e", // Rose 500
+        "#701a75"  // Fuchsia 900
+    ];
+
+    let items = [];
+    let canvas, ctx;
+    let currentAngle = 0;
+    let isSpinning = false;
+    let selectedIndex = -1;
+
+    // Inicialización
+    window.onload = () => {
+        canvas = document.getElementById("wheelCanvas");
+        ctx = canvas.getContext("2d");
+
+        // Ajustar resolución del Canvas
+        canvas.width = 800;
+        canvas.height = 800;
+
+        loadItems();
+        drawWheel();
+    };
+
+    // Cargar preguntas desde la URL, localStorage o por defecto
+    function loadItems() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const dataParam = urlParams.get("data");
+
+        if (dataParam) {
+            try {
+                items = JSON.parse(decodeURIComponent(escape(atob(dataParam))));
+            } catch (e) {
+                items = [...defaultQuestions];
+            }
+        } else {
+            const saved = localStorage.getItem("ruleta_preguntas_so");
+            if (saved) {
+                try {
+                    items = JSON.parse(saved);
+                } catch (e) {
+                    items = [...defaultQuestions];
+                }
+            } else {
+                items = [...defaultQuestions];
+            }
+        }
+        renderList();
+    }
+
+    // Guardar lista actual en localStorage
+    function saveState() {
+        localStorage.setItem("ruleta_preguntas_so", JSON.stringify(items));
+        renderList();
+        drawWheel();
+    }
+
+    // Dibujar Ruleta en Canvas HTML5
+    function drawWheel() {
+        if (!ctx) return;
+        const numItems = items.length;
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = canvas.width / 2 - 20;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (numItems === 0) {
+            // Dibujar círculo vacío
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = "#2b0416";
+            ctx.fill();
+            ctx.strokeStyle = "#e11d48";
+            ctx.lineWidth = 8;
+            ctx.stroke();
+
+            ctx.fillStyle = "#fda4af";
+            ctx.font = "bold 28px Poppins";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("¡Agrega preguntas!", centerX, centerY);
+            return;
+        }
+
+        const sliceAngle = (2 * Math.PI) / numItems;
+
+        for (let i = 0; i < numItems; i++) {
+            const angle = currentAngle + i * sliceAngle;
+
+            // Dibujar gajo / sector
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, angle, angle + sliceAngle);
+            ctx.closePath();
+
+            ctx.fillStyle = colorPalette[i % colorPalette.length];
+            ctx.fill();
+
+            ctx.strokeStyle = "rgba(18, 0, 8, 0.6)";
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            // Dibujar texto dentro del gajo
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(angle + sliceAngle / 2);
+            ctx.textAlign = "right";
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 20px Poppins";
+
+            // Recortar texto si es muy largo
+            let text = items[i];
+            if (text.length > 24) text = text.substring(0, 22) + "...";
+
+            ctx.fillText(text, radius - 30, 8);
+            ctx.restore();
+        }
+
+        // Dibujar Círculo Central Elegante
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 55, 0, 2 * Math.PI);
+        ctx.fillStyle = "#120008";
+        ctx.fill();
+        ctx.strokeStyle = "#e11d48";
+        ctx.lineWidth = 6;
+        ctx.stroke();
+
+        // Ícono o punto central
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 15, 0, 2 * Math.PI);
+        ctx.fillStyle = "#f43f5e";
+        ctx.fill();
+    }
+
+    // Girar la Ruleta con Físicas Simuladas
+    function spinWheel() {
+        if (isSpinning || items.length === 0) return;
+
+        isSpinning = true;
+        document.getElementById("spinBtn").disabled = true;
+
+        // Calcular rotación aleatoria
+        const totalSlices = items.length;
+        const sliceAngle = (2 * Math.PI) / totalSlices;
+
+        // Giro adicional (entre 5 y 8 vueltas completas)
+        const extraRotations = (Math.floor(Math.random() * 4) + 5) * 2 * Math.PI;
+        const randomOffset = Math.random() * sliceAngle;
+
+        const targetAngle = currentAngle + extraRotations + randomOffset;
+        const duration = 4500; // 4.5 segundos
+        const startTime = performance.now();
+
+        function animate(currentTime) {
+            const elapsed = currentTime - startTime;
+            if (elapsed < duration) {
+                // Easing out cubic para desaceleración suave
+                const progress = elapsed / duration;
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                currentAngle = currentAngle + (targetAngle - currentAngle) * (easeOut * 0.08);
+
+                drawWheel();
+                requestAnimationFrame(animate);
+            } else {
+                currentAngle = targetAngle % (2 * Math.PI);
+                drawWheel();
+                isSpinning = false;
+                document.getElementById("spinBtn").disabled = false;
+
+                // Determinar el ítem seleccionado en la aguja superior (-PI/2)
+                calculateWinner();
+            }
+        }
+
+        requestAnimationFrame(animate);
+    }
+
+    // Calcular la pregunta seleccionada apuntada por la aguja superior
+    function calculateWinner() {
+        const numItems = items.length;
+        const sliceAngle = (2 * Math.PI) / numItems;
+
+        // Normalizar ángulo actual
+        let normalizedAngle = (currentAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+
+        // La aguja está arriba (-Math.PI / 2)
+        let pointerAngle = (3 * Math.PI / 2 - normalizedAngle + 2 * Math.PI) % (2 * Math.PI);
+
+        selectedIndex = Math.floor(pointerAngle / sliceAngle) % numItems;
+
+        // Mostrar resultado en el Modal
+        showModal(items[selectedIndex]);
+    }
+
+    // Renderizar Lista de Preguntas en el Panel Lateral
+    function renderList() {
+        const listEl = document.getElementById("itemsList");
+        const countEl = document.getElementById("itemsCount");
+        listEl.innerHTML = "";
+        countEl.innerText = items.length;
+
+        if (items.length === 0) {
+            listEl.innerHTML = `<li class="text-rose-400/60 text-xs text-center py-4 italic">No hay preguntas disponibles. ¡Agrega una nueva arriba!</li>`;
+            return;
+        }
+
+        items.forEach((item, idx) => {
+            const li = document.createElement("li");
+            li.className = "flex justify-between items-center bg-black/40 border border-rose-900/40 rounded-xl p-3 text-xs md:text-sm text-rose-100 hover:border-rose-600/50 transition group";
+
+            li.innerHTML = `
+                    <span class="truncate pr-2 font-medium">${item}</span>
+                    <button onclick="removeItem(${idx})" class="text-rose-400/60 hover:text-rose-300 hover:bg-rose-900/50 p-1.5 rounded-lg transition" title="Eliminar">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                `;
+            listEl.appendChild(li);
+        });
+    }
+
+    // Agregar una nueva pregunta
+    function addItem(e) {
+        e.preventDefault();
+        const input = document.getElementById("newItemInput");
+        const val = input.value.trim();
+        if (val) {
+            items.push(val);
+            input.value = "";
+            saveState();
+            showToast("Pregunta agregada con éxito");
+        }
+    }
+
+    // Eliminar una pregunta de la lista por su índice
+    function removeItem(index) {
+        items.splice(index, 1);
+        saveState();
+        showToast("Pregunta eliminada");
+    }
+
+    // Eliminar la pregunta actual recién seleccionada en la ruleta
+    function removeCurrentQuestion() {
+        if (selectedIndex >= 0 && selectedIndex < items.length) {
+            items.splice(selectedIndex, 1);
+            saveState();
+            closeModal();
+            showToast("Pregunta descartada de la ruleta");
+        }
+    }
+
+    // Restablecer preguntas por defecto
+    function resetDefaultItems() {
+        items = [...defaultQuestions];
+        saveState();
+        showToast("Preguntas restablecidas");
+    }
+
+    // Generar enlace compartible codificado en la URL
+    function shareURL() {
+        try {
+            const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(items))));
+            const shareableURL = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
+
+            // Copiar al portapapeles con execCommand para mayor compatibilidad
+            const dummy = document.createElement("input");
+            document.body.appendChild(dummy);
+            dummy.value = shareableURL;
+            dummy.select();
+            document.execCommand("copy");
+            document.body.removeChild(dummy);
+
+            showToast("¡Enlace directo copiado al portapapeles!");
+        } catch (err) {
+            showToast("Error al codificar el enlace");
+        }
+    }
+
+    function showModal(questionText) {
+        document.getElementById("modalQuestion").innerText = questionText;
+        document.getElementById("resultModal").classList.remove("hidden");
+    }
+
+    function closeModal() {
+        document.getElementById("resultModal").classList.add("hidden");
+    }
+
+    function showToast(msg) {
+        const toast = document.getElementById("toast");
+        document.getElementById("toastMsg").innerText = msg;
+        toast.classList.remove("hidden");
+        setTimeout(() => {
+            toast.classList.add("hidden");
+        }, 3000);
+    }
+</script>
+</body>
+</html>
