@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruleta de Evaluacion - Respaldos SSH/SCP</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-color: #1f2937;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 { margin-bottom: 5px; color: var(--primary); text-align: center; }
+        .subtitle { color: #6b7280; margin-bottom: 25px; font-size: 0.95rem; text-align: center; }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            max-width: 950px;
+            width: 100%;
+        }
+
+        @media (max-width: 768px) {
+            .container { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 1.25rem;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 8px;
+        }
+
+        .input-group { display: flex; gap: 10px; margin-bottom: 15px; }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        button:hover { background-color: var(--primary-hover); }
+
+        .btn-share {
+            background-color: #059669;
+            width: 100%;
+            margin-top: 10px;
+            padding: 12px;
+            font-size: 1rem;
+        }
+        .btn-share:hover { background-color: #047857; }
+
+        .btn-danger {
+            background-color: #ef4444;
+            padding: 4px 8px;
+            font-size: 0.8rem;
+        }
+        .btn-danger:hover { background-color: #dc2626; }
+
+        ul.items-list {
+            list-style: none;
+            padding: 0;
+            max-height: 280px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+        }
+
+        ul.items-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 0.9rem;
+        }
+
+        .wheel-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 320px;
+            height: 320px;
+            margin: 10px 0;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 0 15px rgba(0,0,0,0.15);
+        }
+
+        .pointer {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 14px solid transparent;
+            border-right: 14px solid transparent;
+            border-top: 24px solid #ef4444;
+            z-index: 10;
+        }
+
+        .spin-btn {
+            background-color: #10b981;
+            font-size: 1.1rem;
+            padding: 12px 30px;
+            border-radius: 30px;
+            margin-top: 10px;
+            text-transform: uppercase;
+        }
+        .spin-btn:hover { background-color: #059669; }
+
+        #result-display {
+            margin-top: 15px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: var(--primary);
+            min-height: 40px;
+            text-align: center;
+            padding: 0 10px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Ruleta de Preguntas / Incisos</h1>
+<div class="subtitle">Práctica: Respaldos Automáticos SSH, SCP y Cron</div>
+
+<div class="container">
+    <!-- Panel de Gestión -->
+    <div class="card">
+        <h2>Lista de Incisos</h2>
+
+        <div class="input-group">
+            <input type="text" id="item-input" placeholder="Agregar nuevo inciso..." />
+            <button id="add-btn">Agregar</button>
+        </div>
+
+        <ul id="items-list" class="items-list"></ul>
+
+        <button class="btn-share" id="share-btn">🔗 Copiar Enlace Directo</button>
+    </div>
+
+    <!-- Panel Ruleta -->
+    <div class="card wheel-section">
+        <h2>Girar Ruleta</h2>
+
+        <div class="wheel-container">
+            <div class="pointer"></div>
+            <canvas id="wheel" width="500" height="500"></canvas>
+        </div>
+
+        <button class="spin-btn" id="spin-btn">¡Girar!</button>
+        <div id="result-display"></div>
+    </div>
+</div>
+
+<script>
+    const defaultItems = [
+        "Las direcciones IP y nombres de ambos equipos.",
+        "La prueba de conectividad mediante ping.",
+        "El estado activo del servicio SSH en el equipo B.",
+        "El directorio respaldos_remotos y sus permisos.",
+        "La conexión SSH desde el equipo A.",
+        "La creación y validación del respaldo manual.",
+        "La transferencia manual mediante SCP.",
+        "La comparación de las sumas SHA-256.",
+        "La creación de la llave y la prueba con BatchMode=yes.",
+        "El contenido completo del script respaldo_scp.sh.",
+        "La revisión de sintaxis con bash -n.",
+        "La ejecución manual del script.",
+        "La bitácora respaldo_scp.log.",
+        "Los archivos almacenados en el equipo B.",
+        "El estado activo del servicio cron.",
+        "La tarea registrada mediante crontab -l.",
+        "Los registros de cron.",
+        "La descarga del respaldo remoto.",
+        "La restauración y la comparación con diff."
+    ];
+
+    function getItemsFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        const data = params.get('data');
+        if (data) {
+            try {
+                return JSON.parse(decodeURIComponent(data));
+            } catch (e) {
+                console.error("Error al leer datos de la URL", e);
+            }
+        }
+        return null;
+    }
+
+    let items = getItemsFromURL() || JSON.parse(localStorage.getItem('ruleta_incisos_ssh')) || defaultItems;
+
+    const itemInput = document.getElementById('item-input');
+    const addBtn = document.getElementById('add-btn');
+    const itemsList = document.getElementById('items-list');
+    const spinBtn = document.getElementById('spin-btn');
+    const shareBtn = document.getElementById('share-btn');
+    const resultDisplay = document.getElementById('result-display');
+    const canvas = document.getElementById('wheel');
+    const ctx = canvas.getContext('2d');
+
+    let startAngle = 0;
+    let arc = 0;
+    let spinTimeout = null;
+    let spinAngleStart = 0;
+    let spinTime = 0;
+    let spinTimeTotal = 0;
+
+    const colors = [
+        '#4f46e5', '#06b6d4', '#10b981', '#f59e0b',
+        '#ef4444', '#8b5cf6', '#ec4899', '#3b82f6',
+        '#14b8a6', '#f97316', '#6366f1', '#84cc16'
+    ];
+
+    function saveAndRender() {
+        localStorage.setItem('ruleta_incisos_ssh', JSON.stringify(items));
+        renderList();
+        drawWheel();
+    }
+
+    function renderList() {
+        itemsList.innerHTML = '';
+        if (items.length === 0) {
+            itemsList.innerHTML = '<li style="color: #9ca3af; justify-content: center;">Sin incisos</li>';
+            return;
+        }
+        items.forEach((item, index) => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                    <span>${index + 1}. ${item}</span>
+                    <button class="btn-danger" onclick="removeItem(${index})">Eliminar</button>
+                `;
+            itemsList.appendChild(li);
+        });
+    }
+
+    window.removeItem = function(index) {
+        items.splice(index, 1);
+        saveAndRender();
+    }
+
+    addBtn.addEventListener('click', () => {
+        const val = itemInput.value.trim();
+        if (val) {
+            items.push(val);
+            itemInput.value = '';
+            saveAndRender();
+        }
+    });
+
+    itemInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') addBtn.click();
+    });
+
+    shareBtn.addEventListener('click', () => {
+        if (items.length === 0) {
+            alert("Agrega incisos antes de generar el enlace.");
+            return;
+        }
+        const encodedData = encodeURIComponent(JSON.stringify(items));
+        const shareableURL = `${window.location.origin}${window.location.pathname}?data=${encodedData}`;
+
+        navigator.clipboard.writeText(shareableURL).then(() => {
+            alert("¡Enlace directo copiado al portapapeles!");
+        }).catch(() => {
+            prompt("Copia este enlace manualmente:", shareableURL);
+        });
+    });
+
+    function drawWheel() {
+        if (items.length === 0) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
+        arc = Math.PI / (items.length / 2);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const outsideRadius = 230;
+        const textRadius = 150;
+        const insideRadius = 30;
+
+        for (let i = 0; i < items.length; i++) {
+            const angle = startAngle + i * arc;
+            ctx.fillStyle = colors[i % colors.length];
+
+            ctx.beginPath();
+            ctx.arc(250, 250, outsideRadius, angle, angle + arc, false);
+            ctx.arc(250, 250, insideRadius, angle + arc, angle, true);
+            ctx.stroke();
+            ctx.fill();
+
+            ctx.save();
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 12px sans-serif";
+            ctx.translate(
+                250 + Math.cos(angle + arc / 2) * textRadius,
+                250 + Math.sin(angle + arc / 2) * textRadius
+            );
+            ctx.rotate(angle + arc / 2 + Math.PI / 2);
+            let text = `${i + 1}. ` + items[i];
+            if (text.length > 22) text = text.substring(0, 20) + '...';
+            ctx.fillText(text, -ctx.measureText(text).width / 2, 0);
+            ctx.restore();
+        }
+
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(250, 250, insideRadius, 0, 2 * Math.PI, false);
+        ctx.fill();
+    }
+
+    function rotateWheel() {
+        spinTime += 30;
+        if (spinTime >= spinTimeTotal) {
+            stopRotateWheel();
+            return;
+        }
+        const spinAngle = spinAngleStart - easeOut(spinTime, 0, spinAngleStart, spinTimeTotal);
+        startAngle += (spinAngle * Math.PI / 180);
+        drawWheel();
+        spinTimeout = setTimeout(rotateWheel, 30);
+    }
+
+    function stopRotateWheel() {
+        clearTimeout(spinTimeout);
+        const degrees = startAngle * 180 / Math.PI + 90;
+        const arcd = arc * 180 / Math.PI;
+        const index = Math.floor((360 - (degrees % 360)) / arcd);
+        resultDisplay.innerHTML = `🎯 <strong>Inciso Seleccionado:</strong><br>${items[index]}`;
+        spinBtn.disabled = false;
+    }
+
+    function easeOut(t, b, c, d) {
+        const ts = (t /= d) * t;
+        const tc = ts * t;
+        return b + c * (tc + (-3 * ts + 3 * t));
+    }
+
+    spinBtn.addEventListener('click', () => {
+        if (items.length === 0) return;
+        resultDisplay.innerHTML = "";
+        spinBtn.disabled = true;
+        spinAngleStart = Math.random() * 10 + 10;
+        spinTime = 0;
+        spinTimeTotal = Math.random() * 3000 + 4000;
+        rotateWheel();
+    });
+
+    renderList();
+    drawWheel();
+</script>
+</body>
+</html>
